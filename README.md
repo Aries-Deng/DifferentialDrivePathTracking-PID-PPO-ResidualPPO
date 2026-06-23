@@ -1,234 +1,195 @@
-# Homework: PPO + Velocity Walking + Motion Tracking (Unitree G1)
+# Differential Drive and Unitree G1 Motion Control Experiments
 
-This homework has three parts. Part 1 is a smaller pure-NumPy PPO exercise.
-Parts 2 and 3 use the Unitree G1 in [mjlab](https://github.com/mujocolab/mjlab)
-(MuJoCo-Warp + rsl_rl PPO).
+本项目是在原三部分 homework 框架上扩展出的运动控制实验集合。整体目标是比较两类具身平台上的三种控制思路：传统 PID、端到端 PPO，以及 PID 与残差 PPO 的混合控制。
 
-The robot-control tasks are intentionally lightweight: first direct velocity
-walking, then a single motion-tracking task with a mostly complete framework.
+实验分为两个系统：
 
-## Installation
+- `DifferentialDrivePathTracking-master/`：差速驱动小车路径跟踪实验，在低维运动学模型上实现并比较 PID、PPO、PID + residual PPO。
+- `hw_py/` 与 `hw_mjlab/`：Unitree G1 人形机器人实验，在 MuJoCo/mjlab 环境中实现速度行走和单段舞蹈动作跟踪。
 
-```shell
-conda create -n hw python=3.10
-conda activate hw
-pip install -r requirements.txt
-```
-
-For Parts 2 and 3 in this workspace, use:
-
-```shell
-conda activate mjlab
-```
-
-A GPU is recommended for Parts 2 and 3.
-
-## Project Layout
+## Repository Layout
 
 ```text
-hw_py/
-  part1_ppo.py                 # NumPy PPO components (Part 1)
-  part2_walk.py                # velocity walking reward + observation design
-  part3_dance_single.py        # single-trajectory tracking parameter tuning
-hw_mjlab/
-  walk/                        # shared G1 velocity-walking config
-  dance/                       # shared single tracking reference + env config
-  tracking_rewards.py          # reusable shaping utilities for walking/tracking
-  train.py                     # rsl_rl PPO training helper
-  evaluate.py                  # rollout, metric plot, and video helper
+.
+├── DifferentialDrivePathTracking-master/
+│   ├── main.py                         # 差速小车 PID 路径跟踪
+│   ├── ppo_path_tracking.py            # 差速小车端到端 PPO 路径跟踪
+│   ├── ppo_pid_residual_path_tracking.py
+│   │                                   # 差速小车 PID + 残差 PPO 路径跟踪
+│   ├── Parkour.py                      # 原项目可视化辅助代码
+│   ├── outputs/                        # 差速小车实验图像、模型和误差曲线
+│   └── README.md                       # 原差速小车项目说明
+├── hw_py/
+│   ├── part1_ppo.py                    # 原 homework 的 NumPy PPO 基础练习
+│   ├── part2_walk.py                   # Unitree G1 速度行走 PPO 训练与评估
+│   ├── part3_dance_single.py           # Unitree G1 单段舞蹈 PPO 跟踪
+│   ├── part3_dance_pid_baseline.py     # Unitree G1 舞蹈 PID/PD baseline 与 hybrid 评估入口
+│   ├── motion/g1_hiphop_tracking.npz   # G1 hiphop 参考动作数据
+│   ├── outputs/                        # G1 舞蹈 PID / PPO / hybrid 对比输出
+│   ├── part2_model_final.pt            # G1 行走训练结果
+│   └── part3_model_final.pt            # G1 舞蹈 PPO 训练结果
+├── hw_mjlab/
+│   ├── walk/                           # Unitree G1 行走环境配置
+│   ├── dance/                          # Unitree G1 舞蹈跟踪环境配置
+│   ├── tracking_rewards.py             # 速度/动作跟踪 reward 工具
+│   ├── train.py                        # rsl_rl PPO 训练封装
+│   └── evaluate.py                     # rollout、误差图和视频导出工具
+├── outputs/                            # homework 根目录输出备份
+├── Assignment3.pdf                     # 原作业说明
+└── requirements.txt                    # Python 依赖
 ```
 
-Students only edit files inside `hw_py/`.
+## Experiments
 
-## Submission
+### 1. Differential Drive: PID Path Tracking
 
-Submit the following files:
-
-- `hw_py/part1_ppo.py`
-- `hw_py/part2_walk.py`
-- `hw_py/part3_dance_single.py`
-- one Part 2 checkpoint `.pt` file trained from your implementation
-- one Part 3 checkpoint `.pt` file trained from your implementation
-- `hw_py/part2_walk_LinVel_error.png`
-- `hw_py/part2_walk_video.mp4`
-- `hw_py/part3_dance_single_error.png`
-- `hw_py/part3_dance_single_video.mp4`
-
-If you submit multiple checkpoints for the same part, clearly mark which one is
-the final version used for grading.
-
-We will check submitted `.pt` files for duplication/similarity. Reused,
-shared, or trivially renamed checkpoints will be treated as plagiarism.
-
-## Score Breakdown
-
-- Part 1 PPO math: **20%**
-- Part 2 direct velocity walking: **40%**
-- Part 3 single motion tracking: **40%**
-
----
-
-# Part 1 - PPO Advantage Estimation and Loss Computation (20%)
-
-Implement key PPO components using NumPy in [hw_py/part1_ppo.py](hw_py/part1_ppo.py):
-Monte Carlo advantage, TD residual advantage, GAE, clipped policy loss, and
-value loss.
+入口文件：
 
 ```shell
-python -m hw_py.part1_ppo
+python DifferentialDrivePathTracking-master/main.py
 ```
 
----
+该实验使用差速小车运动学模型，将若干带时间戳的关键点采样为参考轨迹。PID 控制器根据 lookahead 目标点计算角速度，并按参考速度前进。
 
-# Part 2 - Direct Velocity Walking (40%)
+主要输出：
 
-The Unitree G1 follows joystick-style velocity commands `(v_x, v_y, omega_z)` on
-flat ground. This is a direct velocity-walking task, not a motion-imitation or
-human-likeness objective.
+- `DifferentialDrivePathTracking-master/outputs/differential_drive_tracking_error.png`
+- `DifferentialDrivePathTracking-master/outputs/differential_drive_tracking_path.png`
+- `DifferentialDrivePathTracking-master/outputs/differential_drive_heading_tracking.png`
 
-Edit [hw_py/part2_walk.py](hw_py/part2_walk.py). The base configuration already
-contains the necessary proprioceptive observations and regularization rewards.
-Students add two compact observation terms and replace two command-tracking
-reward terms:
+### 2. Differential Drive: PPO Path Tracking
 
-1. `observe_velocity_error` - command-tracking context, such as commanded minus
-   measured body-frame twist.
-2. `observe_stability_context` - small balance context, such as projected
-   gravity, angular velocity, or vertical drift.
-3. `track_linear_velocity` - reward matching commanded xy velocity.
-4. `track_angular_velocity` - reward matching commanded yaw rate.
+入口文件：
 
-The final walking policy is trained with more than these two tracking rewards.
-The actor observation already includes base velocity, angular velocity,
-projected gravity, joint position/velocity, previous action, and command. The
-critic additionally receives foot height, air time, contact state, and contact
-forces. The inherited reward set keeps upright, pose, body angular velocity,
-angular momentum, joint-limit, action-rate, foot-clearance, foot-swing,
-foot-slip, soft-landing, and self-collision terms. These inherited terms provide
-the regularization needed for a usable walking policy; students should keep
-their additions compact and focused on command tracking.
+```shell
+python DifferentialDrivePathTracking-master/ppo_path_tracking.py
+```
 
-Run the script; it trains a PPO policy and evaluates a fixed forward command of
-`1.0 m/s`, saving:
+该实验将路径跟踪建模为强化学习任务。策略网络根据当前位置误差、lookahead 误差、航向误差、参考速度和轨迹相位，直接输出速度修正与角速度控制。
 
-- `hw_py/part2_walk_LinVel_error.png`
-- `hw_py/part2_walk_video.mp4`
+主要输出：
+
+- `DifferentialDrivePathTracking-master/outputs/ppo_differential_drive_model.pt`
+- `DifferentialDrivePathTracking-master/outputs/ppo_differential_drive_tracking_error.png`
+- `DifferentialDrivePathTracking-master/outputs/ppo_differential_drive_tracking_path.png`
+- `DifferentialDrivePathTracking-master/outputs/ppo_differential_drive_heading_tracking.png`
+- `DifferentialDrivePathTracking-master/outputs/ppo_training_reward.png`
+
+### 3. Differential Drive: PID + Residual PPO
+
+入口文件：
+
+```shell
+python DifferentialDrivePathTracking-master/ppo_pid_residual_path_tracking.py
+```
+
+该实验使用 PID 作为名义控制器，PPO 只学习叠加在 PID 输出上的有界残差。这样可以保留 PID 的稳定先验，同时让学习策略补偿转弯、速度变化和时序误差带来的偏差。
+
+主要输出：
+
+- `DifferentialDrivePathTracking-master/outputs/ppo_pid_residual_differential_drive_model.pt`
+- `DifferentialDrivePathTracking-master/outputs/ppo_pid_residual_tracking_error.png`
+- `DifferentialDrivePathTracking-master/outputs/ppo_pid_residual_tracking_path.png`
+- `DifferentialDrivePathTracking-master/outputs/ppo_pid_residual_heading_tracking.png`
+- `DifferentialDrivePathTracking-master/outputs/ppo_pid_residual_commands.png`
+- `DifferentialDrivePathTracking-master/outputs/ppo_pid_residual_training_reward.png`
+
+### 4. Unitree G1: Velocity Walking with PPO
+
+入口文件：
 
 ```shell
 python -m hw_py.part2_walk
 ```
 
-**Grading.** Mean absolute forward-velocity error should be below **0.15 m/s**
-for full credit. Partial credit is given if the robot walks stably but does not
-hit the target speed exactly.
+该实验使用 mjlab 中的 Unitree G1 模型进行平地速度行走。策略接收本体状态、指令速度、速度误差和平衡上下文，通过 PPO 学习跟踪 `(v_x, v_y, omega_z)` 指令。
 
----
+主要输出：
 
-# Part 3 - Single Motion Tracking (40%)
+- `hw_py/part2_model_final.pt`
+- `hw_py/part2_walk_LinVel_error.png`
+- `hw_py/part2_walk_video.mp4`
 
-The G1 receives one fixed periodic reference trajectory. The tracking layout is
-adapted from BeyondMimic-style motion-command tracking while staying inside the
-local mjlab/rsl_rl stack: the policy observes phase-conditioned reference states,
-target joint position/velocity, and root-velocity error; the reward combines
-joint tracking, root linear/angular velocity tracking, and link pose/velocity
-tracking from `hw_py/motion/g1_hiphop_tracking.npz`, plus the inherited stability
-regularizers. The upstream BeyondMimic motion-tracking implementation is
-available as a larger Isaac Lab project, but it is not vendored here because its
-simulator, asset, and motion-file pipeline differ from this lightweight
-homework. The reward implementation is complete. Students only tune four
-interpretable parameters in
-[hw_py/part3_dance_single.py](hw_py/part3_dance_single.py):
+当前固定评估命令为向前速度 `1.0 m/s`。
 
-- `JOINT_POS_STD`
-- `LINK_POSE_STD`
-- `JOINT_POS_WEIGHT`
-- `LINK_POSE_WEIGHT`
+### 5. Unitree G1: Single Dance Tracking with PPO
 
-Recommended search ranges:
-
-- `JOINT_POS_STD`: `0.20` to `0.70`
-- `LINK_POSE_STD`: `0.30` to `1.00`
-- `JOINT_POS_WEIGHT`: `1.5` to `5.0`
-- `LINK_POSE_WEIGHT`: `0.4` to `1.8`
-
-The expected workflow is to run the default setting once, inspect the
-plot/video, adjust one or two parameters, and repeat two or three times. The
-other reward parameters are intentionally fixed so that the tuning task stays
-interactive without turning into a large search problem. The provided default
-setting is intentionally reasonable but not fully tuned, so students should be
-able to improve it with a small number of runs.
-
-Run the script; it trains a PPO policy, evaluates one rollout, and saves:
-
-- `hw_py/part3_dance_single_error.png`
-- `hw_py/part3_dance_single_video.mp4`
+入口文件：
 
 ```shell
 python -m hw_py.part3_dance_single
 ```
 
-To check/play the single-trajectory tracking result without retraining, load a
-checkpoint and call `play()`. This rolls out one fixed hiphop trajectory, prints
-the mean joint-tracking error, and writes the plot/video to `hw_py/`.
+该实验使用 `hw_py/motion/g1_hiphop_tracking.npz` 作为参考动作。策略观测相位条件下的参考关节状态、根部速度误差和机器人本体状态，通过多项 tracking reward 学习单段舞蹈动作跟踪。
 
-The current `mjlab` build in this homework only supports offline rendering
-(`rgb_array`) for this environment. It does **not** provide a pop-up live viewer
-for `play()`, so the intended visualization path is the saved mp4.
+主要输出：
 
-Use the latest checkpoint automatically:
-
-```shell
-CKPT=$(find logs/rsl_rl/hw_part3_dance_single_g1 -name 'model_*.pt' | sort -V | tail -1)
-test -n "$CKPT"
-conda run --no-capture-output -n mjlab python - <<PY
-from hw_py.part3_dance_single import play
-play("$CKPT")
-PY
-```
-
-Or play a specific checkpoint:
-
-```shell
-conda run --no-capture-output -n mjlab python - <<'PY'
-from hw_py.part3_dance_single import play
-play("logs/rsl_rl/hw_part3_dance_single_g1/<timestamp>/model_1200.pt")
-PY
-```
-
-To export the full motion video instead of the default short check rollout,
-enable `full_motion=True`. For the current hiphop reference this uses all 7426
-frames from `hw_py/motion/g1_hiphop_tracking.npz`:
-warning(be patient, it takes a long time to export the full video)
-
-```shell
-conda run --no-capture-output -n mjlab python - <<'PY'
-from hw_py.part3_dance_single import play
-play("logs/rsl_rl/hw_part3_dance_single_g1/<timestamp>/model_1200.pt", full_motion=True)
-PY
-```
-
-After `play()` finishes, inspect the generated files:
-
+- `hw_py/part3_model_final.pt`
 - `hw_py/part3_dance_single_error.png`
 - `hw_py/part3_dance_single_video.mp4`
 
-**Grading.** Mean absolute joint tracking error should be below **0.15 rad**
-for full credit. Partial credit is given if the robot clearly follows the
-rhythm and reduces tracking error above the threshold.
+也可以使用已有 checkpoint 直接评估：
 
----
+```shell
+conda run --no-capture-output -n mjlab python - <<'PY'
+from hw_py.part3_dance_single import play
+play("hw_py/part3_model_final.pt")
+PY
+```
 
-## Tips
+### 6. Unitree G1: PID/PD Dance Baseline and Hybrid Evaluation
 
-- For walking, start with compact observations and simple exponential velocity
-  rewards before adding extra shaping.
-- For tracking, tune standard deviations first, then reward weights. Avoid
-  changing many parameters in one run.
-- For debugging, lower `num_envs` and `max_iterations` in each script's
-  `main()` call.
-- Logs are written under `logs/rsl_rl/<experiment>/<timestamp>/`. Inspect with
-  `tensorboard --logdir logs/`.
+入口文件：
 
-Files and directories prefixed with `DELETE_ME_` are legacy copies, generated
-cache, or temporary smoke-test artifacts. They are intentionally marked for
-cleanup and are not required by the current homework.
+```shell
+conda run --no-capture-output -n mjlab python hw_py/part3_dance_pid_baseline.py
+```
+
+该文件包含两个用途：
+
+- 用参考关节轨迹直接生成 normalized joint-position action，形成 PID/PD 风格的开环/外环 tracking baseline。
+- 在已有 PPO checkpoint 上导出 hybrid/PPO 相关对比结果。
+
+主要输出：
+
+- `hw_py/outputs/part3_dance_pid_error.png`
+- `hw_py/outputs/part3_dance_pid_video.mp4`
+- `hw_py/outputs/part3_dance_hybrid_pid_error.png`
+- `hw_py/outputs/part3_dance_hybrid_pid_video.mp4`
+- `hw_py/outputs/g1_ppo_vs_hybrid_pid_tracking_error.png`
+
+## Installation
+
+基础依赖：
+
+```shell
+conda create -n motion_control python=3.10
+conda activate motion_control
+pip install -r requirements.txt
+```
+
+`requirements.txt` 中包含：
+
+```text
+numpy
+scipy
+matplotlib
+mediapy
+mjlab>=1.1.1
+torch
+```
+
+差速小车实验可以在 CPU 上运行。Unitree G1 的 PPO 训练建议使用带 GPU 的 `mjlab` 环境。
+
+如果已经配置了课程使用的 `mjlab` 环境，可以直接：
+
+```shell
+conda activate mjlab
+```
+
+## Notes
+
+- 差速小车部分是低维运动学实验，适合观察 PID、PPO 和 residual learning 在路径跟踪误差上的差异。
+- Unitree G1 部分是高自由度全身控制实验，控制难点从二维路径跟踪扩展到动态平衡、关节耦合和参考动作可行性。
+- `hw_py/` 里保留了原 homework 的三个 part，但当前项目重点已经扩展为“两类具身平台，三种控制方案”的对比实验。
+- `outputs/` 和各子目录中的 `outputs/` 保存了已生成的误差曲线、路径图和视频，便于直接查看实验结果。
