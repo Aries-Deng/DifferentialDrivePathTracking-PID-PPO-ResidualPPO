@@ -24,7 +24,8 @@
 │   ├── dance_single.py                 # Unitree G1 单段舞蹈 PPO 跟踪
 │   ├── dance_pid_baseline.py           # Unitree G1 舞蹈 PID/PD baseline 与 hybrid 评估入口
 │   ├── dance_pid_residual_ppo.py       # Unitree G1 PID + residual PPO
-│   ├── motion/g1_hiphop_tracking.npz   # G1 hiphop 参考动作数据
+│   ├── motion/
+│       └── motion/g1_hiphop_tracking.npz   # G1 hiphop 参考动作数据
 │   ├── outputs/                        # G1 舞蹈 PID / PPO / hybrid 对比输出
 │   ├── model_final.pt                  # G1 舞蹈 PPO 训练结果
 │   └── pid_residual_model_final.pt     # G1 舞蹈 residual PPO 训练结果
@@ -34,7 +35,6 @@
 │   ├── train.py                        # rsl_rl PPO 训练封装
 │   └── evaluate.py                     # rollout、误差图和视频导出工具
 ├── outputs/                            # homework 根目录输出备份
-├── Assignment3.pdf                     # 原作业说明
 └── requirements.txt                    # Python 依赖
 ```
 
